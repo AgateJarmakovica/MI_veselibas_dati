@@ -1,10 +1,92 @@
+# =====================================================================
+# pyproject.toml for healthdq-ai
+# ---------------------------------------------------------------------
+# Project: healthdq-ai (Promocijas darba prototips)
+# Author: Agate Jarmakoviča
+# Version: 1.2
+# Date: 2025-10-30
+# ---------------------------------------------------------------------
+# Purpose:
+#   Define build configuration and metadata for the reproducible
+#   AI-based healthcare data quality framework (Precision, Completeness, Reusability).
+#   Supports FAIR data principles and Data-Centric AI paradigms.
+# =====================================================================
+
 [build-system]
-requires = ["setuptools", "wheel"]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "healthdq-ai"
-version = "0.1.0"
+version = "1.2.0"
 description = "AI-based data quality framework for healthcare data (Precision, Completeness, Reusability)"
-authors = [{name="Agate (Promocijas darbs)"}]
+authors = [
+    { name = "Agate Jarmakoviča", email = "agate.jarmakovica@example.com" }
+]
+readme = "README.md"
+license = { text = "MIT" }
 requires-python = ">=3.9"
-dependencies = ["pandas","pyyaml","streamlit"]
+keywords = ["AI", "Data Quality", "Healthcare", "FAIR", "Reusability", "Completeness", "Precision", "Data-Centric AI"]
+
+dependencies = [
+    "pandas>=2.0",
+    "pyyaml>=6.0",
+    "streamlit>=1.37",
+    "pytest>=8.0",
+]
+
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Natural Language :: Latvian",
+]
+
+# ---------------------------------------------------------------------
+# Optional Project URLs (Open Science visibility)
+# ---------------------------------------------------------------------
+[project.urls]
+Homepage = "https://github.com/agatej/healthdq-ai"
+Documentation = "https://github.com/agatej/healthdq-ai/docs"
+Source = "https://github.com/agatej/healthdq-ai"
+Issues = "https://github.com/agatej/healthdq-ai/issues"
+DOI = "https://doi.org/10.xxxx/zenodo.healthdq-ai"
+
+# ---------------------------------------------------------------------
+# Reproducibility and FAIR metadata
+# ---------------------------------------------------------------------
+[tool.healthdq.meta]
+project_purpose = "AI-based framework for improving healthcare data quality across precision, completeness, and reusability dimensions."
+academic_context = "Promocijas darbs, Latvijas Universitāte, 2025"
+principles = ["FAIR", "Open Science", "Data-Centric AI"]
+license = "MIT"
+version_control = "GitHub"
+reproducibility_status = "Validated"
+contact_person = "Agate Jarmakoviča"
+
+# ---------------------------------------------------------------------
+# Tool configurations (testing, linting, formatting)
+# ---------------------------------------------------------------------
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = "-v --tb=short"
+testpaths = ["tests"]
+
+[tool.flake8]
+max-line-length = 100
+exclude = [".git", "__pycache__", "build", "dist", "venv"]
+
+[tool.black]
+line-length = 100
+target-version = ['py311']
+
+[tool.mypy]
+ignore_missing_imports = true
+strict = true
+
+# =====================================================================
+# END OF FILE
+# =====================================================================
