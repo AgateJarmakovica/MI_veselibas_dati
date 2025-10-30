@@ -1,0 +1,50 @@
+# DQ rules + imputation + semantic maps (can be extended per dataset)
+required_columns:
+  - patient_id
+  - birth_date
+rules:
+  - name: gender_categorical
+    type: categorical
+    column: sex_at_birth
+    allowed: [F, M, U, female, male, Unknown, Other, None]
+  - name: birth_date_past
+    type: date_in_past
+    column: birth_date
+  - name: height_range
+    type: range
+    column: height_cm
+    min: 40
+    max: 250
+  - name: weight_range
+    type: range
+    column: weight_kg
+    min: 1
+    max: 400
+  - name: bmi_nonnegative
+    type: nonnegative
+    column: bmi
+  - name: icd10_format
+    type: regex_optional
+    column: icd10_code
+    pattern: "^[A-TV-Z][0-9]{2}(\.[0-9A-Z]{1,2})?$"
+imputation:
+  strategy:
+    height_cm: median
+    weight_kg: median
+    sex_at_birth: mode
+    bmi: compute_from_height_weight
+semantic_maps:
+  sex_at_birth:
+    female: F
+    male: M
+    F: F
+    M: M
+    Unknown: U
+    Other: U
+metrics:
+  - name: completeness_not_null_rate
+    type: not_null_rate
+    columns: [patient_id, sex_at_birth, birth_date, height_cm, weight_kg, bmi]
+  - name: precision_out_of_range_rate
+    type: out_of_range_rate
+    columns: [height_cm, weight_kg, bmi]

@@ -1,0 +1,10 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+
+[project]
+name = "healthdq-ai"
+version = "0.1.0"
+description = "AI-based data quality framework for healthcare data (Precision, Completeness, Reusability)"
+authors = [{name="Agate (Promocijas darbs)"}]
+requires-python = ">=3.9"
+dependencies = ["pandas","pyyaml","streamlit"]
