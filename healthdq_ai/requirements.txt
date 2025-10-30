@@ -1,3 +1,36 @@
-pandas
-pyyaml
-streamlit
+# =====================================================================
+# requirements.txt for healthdq-ai
+# ---------------------------------------------------------------------
+# Project: healthdq-ai (Promocijas darba prototips)
+# Author: Agate Jarmakoviča
+# Version: 1.2
+# Date: 2025-10-30
+# ---------------------------------------------------------------------
+# Purpose:
+#   Define deterministic dependencies for the reproducible AI framework
+#   improving healthcare data quality across three dimensions:
+#     - Precision (validity, logical consistency)
+#     - Completeness (missing data handling)
+#     - Reusability (semantic harmonization)
+# ---------------------------------------------------------------------
+# FAIR principles:
+#   This environment ensures Reusability & Reproducibility
+#   for open-science and data-centric AI workflows.
+# =====================================================================
+
+# --- Core dependencies ------------------------------------------------
+pandas==2.2.2          # Data handling, cleaning, and metric computation
+pyyaml==6.0.2          # Parsing YAML rules and configuration files
+streamlit==1.37.0      # Interactive HITL (Human-in-the-Loop) web UI
+
+# --- Testing & quality assurance -------------------------------------
+pytest==8.1.1          # Unit testing for reproducibility validation
+flake8==7.0.0          # Static code analysis (PEP8 compliance)
+black==24.3.0          # Code formatting for consistency
+mypy==1.10.0           # Static type checking (optional)
+isort==5.13.2          # Consistent import sorting
+
+# --- FAIR reproducibility & experiment logging ------------------------
+numpy==1.26.4          # Mathematical support for metric calculations
+plotly==5.21.0         # Optional interactive metric visualization
+watchdog==4.0.1        # Streamlit file watcher (for auto-reload)
