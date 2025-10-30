@@ -1,0 +1,128 @@
+# =====================================================================
+# Rules configuration file for healthdq-ai
+# Project: healthdq-ai (Promocijas darba prototips)
+# Author: Agate Jarmakoviča
+# Version: 1.2
+# Date: 2025-10-30
+# ---------------------------------------------------------------------
+# Purpose:
+#   Define the rule-based and AI-assisted data quality validation,
+#   imputation, and semantic normalization framework for healthcare datasets.
+#   Focuses on three data quality dimensions:
+#     - Precision (validity and logical consistency)
+#     - Completeness (missing value detection and imputation)
+#     - Reusability (semantic harmonization and standardization)
+# ---------------------------------------------------------------------
+# Based on FAIR and Data-Centric AI principles.
+# =====================================================================
+
+metadata:
+  dataset: "healthcare_quality_data"
+  author: "Agate Jarmakoviča"
+  version: "1.2"
+  created: "2025-10-30"
+
+required_columns:
+  - patient_id
+  - sex_at_birth
+  - birth_date
+  - height_cm
+  - weight_kg
+  - bmi
+
+# ---------------------------------------------------------------------
+# PRECISION RULES (validity and logical correctness)
+# ---------------------------------------------------------------------
+rules:
+  - name: gender_categorical
+    type: categorical
+    column: sex_at_birth
+    allowed: [F, M, U, female, male, Unknown, Other, None]
+
+  - name: birth_date_past
+    type: date_in_past
+    column: birth_date
+
+  - name: height_range
+    type: range
+    column: height_cm
+    min: 40
+    max: 250
+
+  - name: weight_range
+    type: range
+    column: weight_kg
+    min: 1
+    max: 400
+
+  - name: bmi_nonnegative
+    type: nonnegative
+    column: bmi
+
+  - name: bmi_consistency
+    type: derived_consistency
+    column: bmi
+    formula: "weight_kg / ((height_cm/100)**2)"
+    tolerance: 0.25  # ±25% tolerance allowed
+
+  - name: age_range
+    type: derived_range
+    derived_from: birth_date
+    min: 0
+    max: 120
+
+  - name: icd10_format
+    type: regex_optional
+    column: icd10_code
+    pattern: "^[A-TV-Z][0-9]{2}(\\.[0-9A-Z]{1,2})?$"
+
+# ---------------------------------------------------------------------
+# COMPLETENESS STRATEGIES (missing data handling)
+# ---------------------------------------------------------------------
+imputation:
+  strategy:
+    height_cm: median
+    weight_kg: median
+    sex_at_birth: mode
+    bmi:
+      method: conditional_compute
+      condition: "if weight_kg and height_cm available"
+      formula: "weight_kg / ((height_cm/100)**2)"
+
+# ---------------------------------------------------------------------
+# REUSABILITY MAPS (semantic standardization)
+# ---------------------------------------------------------------------
+semantic_maps:
+  sex_at_birth:
+    female: F
+    male: M
+    woman: F
+    man: M
+    Female: F
+    Male: M
+    f: F
+    m: M
+    Unknown: U
+    Other: U
+    none: U
+    unspecified: U
+
+# ---------------------------------------------------------------------
+# METRICS TO COMPUTE (before and after processing)
+# ---------------------------------------------------------------------
+metrics:
+  - name: completeness_not_null_rate
+    type: not_null_rate
+    columns: [patient_id, sex_at_birth, birth_date, height_cm, weight_kg, bmi]
+
+  - name: precision_out_of_range_rate
+    type: out_of_range_rate
+    columns: [height_cm, weight_kg, bmi]
+
+  - name: logical_consistency_rate
+    type: derived_match_rate
+    columns: [bmi]
+
+  - name: semantic_standardization_rate
+    type: categorical_standardization_rate
+    columns: [sex_at_birth]
