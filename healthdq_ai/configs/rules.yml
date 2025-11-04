@@ -1,78 +1,159 @@
 # =====================================================================
-# Universālā datu kvalitātes konfigurācija (AI-driven rules.yml)
-# ---------------------------------------------------------------------
-# Šis fails vairs nedefinē konkrētus laukus.
-# Tā vietā nosaka MI mācīšanās un noteikumu ģenerēšanas principus.
-# =====================================================================
+# Datu kvalitātes konfigurācija (AI-driven rules.yml)
+# 
+# Šis fails nosaka MI mācīšanās un noteikumu ģenerēšanas principus.
+#Batini & Scannapieco (2016) “Data and Information Quality”
+#Wand & Wang (1996) “Anchoring Data Quality Dimensions in Ontological Foundations”
+#  - noteikumu ģenerēšanu (rule_generation)
+#  - semantisku imputāciju (imputation)
+#  - MI modeļu konfigurāciju (ai_models)
+#  - lietotāja līdzdalību (HITL)
+#  - FAIR reproducējamību un API integrāciju
+ =====================================================================
 
 metadata:
   project: "healthdq-ai"
-  author: "Agate Jarmakoviča"
   version: "2.0"
+  author: "Agate Jarmakoviča"
   created: "2025-10-30"
   description: >
-    AI-driven framework for adaptive data quality improvement
-    across arbitrary datasets using schema understanding and rule generation.
-
+    Adaptive AI-driven rule generation and data quality improvement framework
+    aligned with FAIR and Data-Centric AI principles.
+  doi: "pending"
+  license: "MIT"
 # ---------------------------------------------------------------------
-# AI CONFIGURATION
+# 1. AI Schema Learning
 # ---------------------------------------------------------------------
 ai_schema_learning:
   enabled: true
   model_name: "sentence-transformers/all-MiniLM-L6-v2"
-  outputs:
-    learned_schema: "out/ai_learned_schema.json"
-    suggested_rules: "out/rules_suggested.yml"
+  output_schema: "out/ai_learned_schema.json"
+  parameters:
+    min_confidence: 0.7
+    max_concepts: 50
+  ontology_mapping:
+    enabled: true
+    sources: ["SNOMED", "LOINC", "UMLS", "ICD10"]
+    match_threshold: 0.75
 
 # ---------------------------------------------------------------------
-# RULE GENERATION STRATEGY
-Batini & Scannapieco (2016) “Data and Information Quality”
-Wand & Wang (1996) “Anchoring Data Quality Dimensions in Ontological Foundations”
+# 2. Rule Generation Strategy
 # ---------------------------------------------------------------------
 rule_generation:
   enabled: true
   based_on:
-    - schema_structure       # kolonnu nosaukumi un tipi
-    - statistical_discovery  # vērtību sadalījums, min/max, uniqueness
-    - semantic_similarity    # semantiskā tuvība zināmiem konceptiem
+    - schema_structure
+    - statistical_discovery
+    - semantic_similarity
   thresholds:
     correlation: 0.8
     similarity: 0.75
   max_rules_per_column: 5
-  output: "out/rules_generated.yml"
+  rule_output: "out/rules_generated.yml"
+  validation:
+    logical_consistency_check: true
+    redundancy_pruning: true
 
 # ---------------------------------------------------------------------
-# COMPLETENESS / IMPUTATION STRATEGY
+# 3. Completeness / Imputation Strategy
 # ---------------------------------------------------------------------
 imputation:
   detect_missing: true
+  strategy_type: "hybrid_semantic"
   methods:
     numerical: median
     categorical: mode
     datetime: interpolate
-    auto: true  # ļauj modelim izvēlēties metodi
+    auto: true
   ai_support:
     enabled: true
-    model_name: "microsoft/phi-2"  # piemēram, mazo LLM, kas paredz trūkstošās vērtības
+    model_name: "microsoft/phi-2"
+    rationale: >
+      Predicts missing values using semantic relationships
+      between columns and learned schema patterns.
+    confidence_threshold: 0.6
+  logging:
+    store_before_after: true
+    output_dir: "out/imputation_logs/"
 
 # ---------------------------------------------------------------------
-# METRIC SYSTEM (dynamic)
+# 4. Precision (Logical and Semantic Validation)
+# ---------------------------------------------------------------------
+precision:
+  enabled: true
+  checks:
+    - type: range
+      auto_from_stats: true
+    - type: categorical_validity
+      detect_from_unique_values: true
+    - type: regex_pattern
+      detect_from_value_format: true
+  ai_assistance:
+    model: "microsoft/deberta-v3-base"
+    explain_failures: true
+
+# ---------------------------------------------------------------------
+# 5. Reusability / Semantic Harmonization
+# ---------------------------------------------------------------------
+reusability:
+  enabled: true
+  semantic_maps_auto:
+    detect_synonyms: true
+    language_model: "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+  external_vocabularies:
+    - SNOMED
+    - LOINC
+    - WHO ICD-10
+  output: "out/harmonized_data.csv"
+
+# ---------------------------------------------------------------------
+# 6. Metrics System (Pre/Post Processing)
 # ---------------------------------------------------------------------
 metrics:
-  general:
-    - name: completeness_rate
-      type: dynamic_not_null_rate
-      columns: all
+  enabled: true
+  base_metrics:
+    - completeness_rate
+    - precision_rate
+    - reusability_index
+    - logical_consistency_index
+  ai_metrics:
+    - semantic_similarity_gain
+    - missing_value_reduction
+  output_path: "out/metrics_before_after.json"
 
-    - name: anomaly_rate
-      type: ai_detected_anomalies
-      source: ai_schema_learning
+# ---------------------------------------------------------------------
+# 7. Human-in-the-Loop (HITL)
+# ---------------------------------------------------------------------
+hitl:
+  enabled: true
+  mode: "review_and_confirm"
+  interface: "streamlit"
+  parameters:
+    batch_size: 20
+    confidence_threshold: 0.7
+    require_user_approval: true
+  audit_log: "out/hitl_actions.json"
 
-    - name: consistency_index
-      type: logical_coherence
-      compute_from: rules_generated.yml
+# ---------------------------------------------------------------------
+# 8. API and Reproducibility Settings
+# ---------------------------------------------------------------------
+api:
+  enabled: true
+  endpoint: "/api/v1/run_pipeline"
+  allow_upload: true
+  return_artifacts:
+    - cleaned_data
+    - issues
+    - metrics
+    - schema
+  authentication: "token_based"
+  max_file_size_mb: 50
 
-    - name: reusability_index
-      type: semantic_alignment
-      model: "sentence-transformers/all-MiniLM-L6-v2"
-
+reproducibility:
+  track_versions: true
+  store_metadata: true
+  metadata_file: "out/meta.json"
+  include_hashes:
+    - rules_generated.yml
+    - ai_learned_schema.json
+    - pipeline.py
