@@ -1,128 +1,147 @@
 # =====================================================================
-# Rules configuration file for healthdq-ai
-# Project: healthdq-ai (Promocijas darba prototips)
+# Universal AI-Driven Data Quality Rules Configuration (rules.yml)
+# ---------------------------------------------------------------------
+# Project: healthdq-ai
 # Author: Agate Jarmakoviča
-# Version: 1.2
+# Version: 2.0
 # Date: 2025-10-30
-# ---------------------------------------------------------------------
+#
 # Purpose:
-#   Define the rule-based and AI-assisted data quality validation,
-#   imputation, and semantic normalization framework for healthcare datasets.
-#   Focuses on three data quality dimensions:
-#     - Precision (validity and logical consistency)
-#     - Completeness (missing value detection and imputation)
-#     - Reusability (semantic harmonization and standardization)
-# ---------------------------------------------------------------------
-# Based on FAIR and Data-Centric AI principles.
+#   Define a hybrid human + AI system for automated discovery,
+#   validation, and improvement of data quality across any dataset.
+#
+# Methodology:
+#   Based on FAIR and Data-Centric AI principles, integrating:
+#     - Precision  → semantic and logical validity
+#     - Completeness → missingness detection and AI-based imputation
+#     - Reusability → harmonization and semantic alignment
+#
+# References:
+#   - Wang & Strong (1996) — Data Quality Framework
+#   - Batini & Scannapieco (2016) — Data and Information Quality
+#   - Data-Centric AI Principles (Ng, 2023)
+#   - Human-in-the-Loop Design (Amershi et al., 2014)
 # =====================================================================
 
 metadata:
-  dataset: "healthcare_quality_data"
   author: "Agate Jarmakoviča"
-  version: "1.2"
+  project: "healthdq-ai"
+  version: "2.0"
   created: "2025-10-30"
-
-required_columns:
-  - patient_id
-  - sex_at_birth
-  - birth_date
-  - height_cm
-  - weight_kg
-  - bmi
+  description: >
+    Adaptive, AI-assisted rule configuration enabling automatic
+    data quality learning and evaluation for diverse datasets.
 
 # ---------------------------------------------------------------------
-# PRECISION RULES (validity and logical correctness)
+# GENERAL MODEL SETTINGS
 # ---------------------------------------------------------------------
-rules:
-  - name: gender_categorical
-    type: categorical
-    column: sex_at_birth
-    allowed: [F, M, U, female, male, Unknown, Other, None]
-
-  - name: birth_date_past
-    type: date_in_past
-    column: birth_date
-
-  - name: height_range
-    type: range
-    column: height_cm
-    min: 40
-    max: 250
-
-  - name: weight_range
-    type: range
-    column: weight_kg
-    min: 1
-    max: 400
-
-  - name: bmi_nonnegative
-    type: nonnegative
-    column: bmi
-
-  - name: bmi_consistency
-    type: derived_consistency
-    column: bmi
-    formula: "weight_kg / ((height_cm/100)**2)"
-    tolerance: 0.25  # ±25% tolerance allowed
-
-  - name: age_range
-    type: derived_range
-    derived_from: birth_date
-    min: 0
-    max: 120
-
-  - name: icd10_format
-    type: regex_optional
-    column: icd10_code
-    pattern: "^[A-TV-Z][0-9]{2}(\\.[0-9A-Z]{1,2})?$"
+model:
+  name: "healthdq-intelligence-layer"
+  enable_self_learning: true
+  enable_schema_discovery: true
+  enable_cross_dataset_learning: true
+  feedback_mode: "HITL"    # Human-in-the-Loop feedback integration
 
 # ---------------------------------------------------------------------
-# COMPLETENESS STRATEGIES (missing data handling)
+# RULE GENERATION STRATEGY
+# ---------------------------------------------------------------------
+rule_generation:
+  enabled: true
+  based_on:
+    - schema_structure       # detects column names, types, value ranges
+    - statistical_discovery  # finds patterns, min/max, uniqueness
+    - semantic_similarity    # compares column meaning to known concepts
+  thresholds:
+    correlation: 0.8
+    similarity: 0.75
+  max_rules_per_column: 5
+  output: "out/rules_generated.yml"
+
+# ---------------------------------------------------------------------
+# COMPLETENESS / IMPUTATION STRATEGY
 # ---------------------------------------------------------------------
 imputation:
-  strategy:
-    height_cm: median
-    weight_kg: median
-    sex_at_birth: mode
-    bmi:
-      method: conditional_compute
-      condition: "if weight_kg and height_cm available"
-      formula: "weight_kg / ((height_cm/100)**2)"
+  detect_missing: true
+  methods:
+    numerical: median
+    categorical: mode
+    datetime: interpolate
+    auto: true              # model chooses imputation strategy dynamically
+  ai_support:
+    enabled: true
+    model_name: "microsoft/phi-2"  # small LLM for missing value inference
+    confidence_threshold: 0.6
+    use_contextual_cues: true
 
 # ---------------------------------------------------------------------
-# REUSABILITY MAPS (semantic standardization)
+# PRECISION (Semantic & Logical Validation)
 # ---------------------------------------------------------------------
-semantic_maps:
-  sex_at_birth:
-    female: F
-    male: M
-    woman: F
-    man: M
-    Female: F
-    Male: M
-    f: F
-    m: M
-    Unknown: U
-    Other: U
-    none: U
-    unspecified: U
+precision:
+  enabled: true
+  logic_analysis:
+    detect_inconsistencies: true
+    correlation_threshold: 0.85
+    rule_confidence_cutoff: 0.7
+  semantic_analysis:
+    model_name: "sentence-transformers/all-MiniLM-L6-v2"
+    detect_anomalies: true
+    threshold: 0.8
+  ai_support:
+    enabled: true
+    use_reasoning: true     # LLM suggests logical validation improvements
 
 # ---------------------------------------------------------------------
-# METRICS TO COMPUTE (before and after processing)
+# REUSABILITY (Semantic Harmonization)
+# ---------------------------------------------------------------------
+reusability:
+  enabled: true
+  mapping_learning:
+    active: true
+    approach: "few-shot semantic alignment"
+    training_data: "configs/ontology_reference.json"
+  ontology_alignment:
+    standards: ["SNOMED", "LOINC", "ICD-10"]
+    similarity_model: "huggingface/sentence-t5-base"
+  auto_standardization:
+    enabled: true
+    feedback_loop: true     # integrates user corrections into mapping memory
+
+# ---------------------------------------------------------------------
+# QUALITY METRICS CONFIGURATION
 # ---------------------------------------------------------------------
 metrics:
-  - name: completeness_not_null_rate
-    type: not_null_rate
-    columns: [patient_id, sex_at_birth, birth_date, height_cm, weight_kg, bmi]
+  general:
+    - name: completeness_rate
+      type: not_null_rate
+    - name: precision_retention
+      type: logical_consistency
+    - name: reusability_score
+      type: entropy_based
+  ai_discovery:
+    enabled: true
+    model: "healthdq-schema-learner"
+    analyze_columns: true
+    infer_metric_types: true
+    output: "out/metrics_auto_generated.json"
 
-  - name: precision_out_of_range_rate
-    type: out_of_range_rate
-    columns: [height_cm, weight_kg, bmi]
+# ---------------------------------------------------------------------
+# FEEDBACK LEARNING (Human-in-the-Loop)
+# ---------------------------------------------------------------------
+feedback:
+  enabled: true
+  mode: "active_learning"
+  actions:
+    - confirm_rule
+    - reject_rule
+    - edit_rule
+  save_path: "out/hitl_feedback.json"
 
-  - name: logical_consistency_rate
-    type: derived_match_rate
-    columns: [bmi]
+# ---------------------------------------------------------------------
+# FAIR REPRODUCIBILITY METADATA
+# ---------------------------------------------------------------------
+provenance:
+  save_history: true
+  log_file: "out/execution_log.json"
+  record_pipeline_steps: true
+  reproducibility_hash: true
 
-  - name: semantic_standardization_rate
-    type: categorical_standardization_rate
-    columns: [sex_at_birth]
