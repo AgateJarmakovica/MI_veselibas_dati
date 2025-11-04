@@ -24,11 +24,17 @@ Versija: 1.2
 Datums: 2025-10-30
 """
 
+import sys, os
+SRC_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
+if SRC_PATH not in sys.path:
+    sys.path.append(SRC_PATH)
+
 import streamlit as st
 import pandas as pd
 import json
-from ..pipeline import run_pipeline
 import datetime
+
+from healthdq.pipeline import run_pipeline
 
 # ---------------------------------------------------------------------
 # LAPAS KONFIGURĀCIJA
