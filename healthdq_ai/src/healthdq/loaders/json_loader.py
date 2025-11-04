@@ -1,83 +1,93 @@
 """
-json_loader
-===========
+json_loader.py — JSON datu ielādes modulis
 
-Šis modulis īsteno JSON formāta datu ielādi veselības datu kvalitātes prototipam
-*healthdq-ai*, kas ir daļa no promocijas darba
-“Mākslīgā intelekta balstītas pieejas veselības datu kvalitātes uzlabošanai
-atvērtās zinātnes iniciatīvās”.
+Šis modulis nodrošina JSON formāta datu ielādi un konvertēšanu pandas DataFrame formātā.
+Atbalsta:
+- standarta JSON masīvus,
+- ligzdotus (nested) objektus,
+- NDJSON (newline-delimited JSON) failus.
 
-Mērķis:
---------
-Droši, pārredzami un reproducējami ielādēt JSON ierakstus (no failiem vai API),
-pārveidojot tos uz strukturētu pandas DataFrame formātu tālākai datu kvalitātes analīzei.
+Funkcionālais mērķis:
+1. Automātiski noteikt JSON datu struktūru (schema discovery).
+2. Izvilkt ligzdotos laukus līdz tabulveida formātam.
+3. Sagatavot datus AI datu kvalitātes novērtēšanai un imputācijai.
 
-Funkcionalitāte:
-----------------
-- Ielādē JSON failus (ierakstu sarakstus vai atsevišķus vārdnīcu objektus)
-- Nodrošina automātisku strukturēšanu ar `pandas.json_normalize()`
-- Validē datu saturu un saglabā reproducējamības metadatus
-- Atbilst **FAIR principiem**: Findable, Accessible, Interoperable, Reusable
-
-Autore: Agate Jarmakoviča  
-Versija: 1.2  
-Datums: 2025-10-30
+Akadēmiskais pamats:
+- Abedjan, Z. et al. (2016). "Detecting Data Errors: The Systematic Approach".
+- Batini & Scannapieco (2016). “Data and Information Quality”.
+- FAIR Data Principles (Wilkinson et al., 2016)
 """
 
 import json
-import os
 import pandas as pd
-import datetime
+import os
+from typing import Dict, Any
 
 
-def load_json_records(path: str, required_fields: list[str] | None = None) -> pd.DataFrame:
+def analyze_json_schema(df: pd.DataFrame) -> Dict[str, Any]:
     """
-    Ielādē JSON formāta ierakstus un pārveido tos DataFrame formātā.
+    Veic strukturālo analīzi ielādētajam DataFrame:
+    - datu tipi,
+    - trūkstošo vērtību īpatsvars,
+    - unikālo vērtību īpatsvars.
+    """
+    schema = {}
+    for col in df.columns:
+        non_null = df[col].notnull().sum()
+        schema[col] = {
+            "dtype": str(df[col].dtype),
+            "non_null_rate": round(non_null / len(df), 3) if len(df) else 0,
+            "unique_rate": round(df[col].nunique() / len(df), 3) if len(df) else 0,
+            "example_values": df[col].dropna().astype(str).head(3).tolist(),
+        }
+    return schema
+
+
+def load_json_records(file_path: str) -> pd.DataFrame:
+    """
+    Ielādē JSON vai NDJSON datni un pārvērš to pandas DataFrame formātā.
 
     Parametri:
     -----------
-    path : str
-        Ceļš uz JSON failu.
-    required_fields : list[str], optional
-        Lauku saraksts, kas obligāti jāpārbauda (piemēram: ["patient_id", "sex_at_birth"])
+    file_path : str
+        Ceļš uz JSON/NDJSON failu
 
     Atgriež:
     --------
-    df : pd.DataFrame
-        Ielādēta un normalizēta datu kopa ar FAIR reproducējamības metadatiem.
+    pd.DataFrame — ielādētie dati
     """
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"Failu '{file_path}' nevar atrast.")
 
-    if not os.path.exists(path):
-        raise FileNotFoundError(f"❌ JSON fails nav atrasts: {path}")
+    # Pārbauda, vai fails ir NDJSON (viena JSON rinda)
+    with open(file_path, "r", encoding="utf-8") as f:
+        first_line = f.readline().strip()
+        is_ndjson = first_line.startswith("{") and not first_line.endswith("}")
 
     try:
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
+        if is_ndjson:
+            # NDJSON režīms
+            df = pd.read_json(file_path, lines=True)
+        else:
+            # Parasts JSON masīvs
+            with open(file_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            df = pd.json_normalize(data)
+
     except Exception as e:
-        raise RuntimeError(f"❌ Neizdevās nolasīt JSON failu: {e}")
+        raise ValueError(f"Neizdevās ielādēt JSON datus: {e}")
 
-    # Normalizē JSON struktūru
-    try:
-        df = pd.json_normalize(data)
-    except Exception as e:
-        raise ValueError(f"❌ JSON struktūras kļūda: {e}")
+    if df.empty:
+        raise ValueError("Ielādētie JSON dati ir tukši vai nederīgi.")
 
-    # Pārbauda obligātos laukus
-    if required_fields:
-        missing = [c for c in required_fields if c not in df.columns]
-        if missing:
-            raise ValueError(f"⚠️ Trūkst obligātie lauki JSON datos: {missing}")
+    # Strukturālā analīze
+    schema = analyze_json_schema(df)
+    print("JSON struktūras analīze (pirmie lauki):")
+    for col, info in list(schema.items())[:5]:
+        print(f"  {col}: {info}")
 
-    # Izveido reproducējamības metadatus (FAIR un Data-Centric AI atbilstībai)
-    meta = {
-        "loader": "JSON",
-        "path": os.path.abspath(path),
-        "timestamp": datetime.datetime.now().isoformat(),
-        "row_count": len(df),
-        "columns": list(df.columns),
-        "required_fields_checked": required_fields if required_fields else None,
-        "source_type": "JSON file",
-    }
+    return df
+
 
     # Saglabā metadatus DataFrame atribūtos reproducējamībai
     df.attrs["meta"] = meta
