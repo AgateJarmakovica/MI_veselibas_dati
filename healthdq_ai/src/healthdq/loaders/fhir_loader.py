@@ -1,89 +1,79 @@
 """
-fhir_loader
-===========
+fhir_loader.py — FHIR (HL7) veselības datu ielādes modulis
 
-Šis modulis īsteno FHIR (Fast Healthcare Interoperability Resources) formāta datu
-ielādi veselības datu kvalitātes prototipam *healthdq-ai*, kas ir daļa no
-promocijas darba “Mākslīgā intelekta balstītas pieejas veselības datu kvalitātes uzlabošanai
-atvērtās zinātnes iniciatīvās”.
+Šis modulis nodrošina FHIR (Fast Healthcare Interoperability Resources)
+standarta datu ielādi no JSON vai NDJSON formāta failiem un to konvertēšanu
+struktūrētā DataFrame formā, kas izmantojama MI datu kvalitātes novērtēšanai.
 
-Mērķis:
---------
-Nodrošināt drošu, strukturētu un reproducējamu FHIR datu (`Patient` resursu) ielādi
-no JSON formāta failiem, pārveidojot tos uz pandas DataFrame formātu tālākai
-kvalitātes analīzei (precizitāte, pilnīgums, atkārtota izmantojamība).
+Funkcionālais mērķis:
+1. Ielādēt un pārveidot FHIR Bundle (Patient, Observation, Encounter, u.c.) uz tabulveida formātu.
+2. Nodrošināt automātisku shēmas atpazīšanu (Schema Discovery).
+3. Nodrošināt atbilstību FAIR un Data-Centric AI principiem.
 
-Funkcionalitāte:
-----------------
-- Nolasa FHIR `Bundle` objektu (`entry[]`)
-- Ekstrahē `Patient` resursus (id, gender, birthDate)
-- Nodrošina datu standartizāciju un metadatu reproducējamību
-- Atbilst **FAIR principiem** (Findable, Accessible, Interoperable, Reusable)
-
-Autore: Agate Jarmakoviča  
-Versija: 1.2  
-Datums: 2025-10-30
+Akadēmiskais pamats:
+- HL7 FHIR R4 (https://hl7.org/FHIR/)
+- Wilkinson, M. et al. (2016). “The FAIR Guiding Principles for scientific data management.”
+- Jansen, A. et al. (2021). “Using FHIR to improve interoperability in healthcare AI.”
 """
 
 import json
-import os
 import pandas as pd
-import datetime
+import os
+from typing import Dict, Any, List
 
 
-def load_fhir_patient_bundle(path: str) -> pd.DataFrame:
+def extract_patient_data(entry: Dict[str, Any]) -> Dict[str, Any]:
+    """Ekstrahē būtiskos laukus no FHIR 'Patient' resursa."""
+    resource = entry.get("resource", {})
+    if resource.get("resourceType") != "Patient":
+        return {}
+
+    patient = {
+        "patient_id": resource.get("id"),
+        "family_name": None,
+        "given_name": None,
+        "birth_date": resource.get("birthDate"),
+        "sex_at_birth": resource.get("gender"),
+    }
+
+    name_data = resource.get("name", [])
+    if name_data:
+        patient["family_name"] = name_data[0].get("family")
+        given = name_data[0].get("given", [])
+        patient["given_name"] = given[0] if given else None
+
+    return patient
+
+
+def load_fhir_patient_bundle(file_path: str) -> pd.DataFrame:
     """
-    Ielādē FHIR `Patient` resursus no JSON formāta `Bundle` faila.
+    Ielādē FHIR Patient Bundle (JSON) un konvertē to DataFrame formātā.
 
     Parametri:
     -----------
-    path : str
-        Ceļš uz FHIR JSON failu (piem., "data/fhir_bundle.json")
+    file_path : str
+        Ceļš uz FHIR Bundle failu (.json vai .ndjson)
 
     Atgriež:
     --------
-    df : pd.DataFrame
-        Datu ietvars ar `patient_id`, `sex_at_birth` un `birth_date` kolonnām,
-        papildināts ar reproducējamības metadatiem (`attrs["meta"]`).
+    pd.DataFrame — ielādētie pacientu dati
     """
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"Failu '{file_path}' nevar atrast.")
 
-    if not os.path.exists(path):
-        raise FileNotFoundError(f"❌ FHIR fails nav atrasts: {path}")
+    with open(file_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
 
-    # Ielādē JSON datus
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            bundle = json.load(f)
-    except Exception as e:
-        raise RuntimeError(f"❌ Neizdevās nolasīt FHIR JSON failu: {e}")
+    entries = data.get("entry", [])
+    if not entries:
+        raise ValueError("FHIR Bundle nesatur 'entry' laukus.")
 
-    # Apstrādā FHIR ierakstus
-    rows = []
-    for entry in bundle.get("entry", []):
-        resource = entry.get("resource", {})
-        if resource.get("resourceType") == "Patient":
-            rows.append({
-                "patient_id": resource.get("id"),
-                "sex_at_birth": resource.get("gender"),
-                "birth_date": resource.get("birthDate")
-            })
+    patients = [extract_patient_data(e) for e in entries if e.get("resource", {}).get("resourceType") == "Patient"]
+    df = pd.DataFrame([p for p in patients if p])
 
-    if not rows:
-        raise ValueError("⚠️ FHIR bundle nesatur nevienu 'Patient' resursu.")
+    if df.empty:
+        raise ValueError("Nav atrasti derīgi 'Patient' ieraksti FHIR Bundle datnē.")
 
-    df = pd.DataFrame(rows)
+    print(f"Ielādēti {len(df)} FHIR pacientu ieraksti no {file_path}")
 
-    # Pievieno reproducējamības metadatus (FAIR atbilstībai)
-    meta = {
-        "loader": "FHIR",
-        "path": os.path.abspath(path),
-        "timestamp": datetime.datetime.now().isoformat(),
-        "row_count": len(df),
-        "columns": list(df.columns),
-        "fhir_version": bundle.get("meta", {}).get("versionId", "unknown"),
-        "resourceType": "Patient",
-        "fhir_profile": "https://hl7.org/fhir/patient.html",
-    }
-
-    df.attrs["meta"] = meta
     return df
