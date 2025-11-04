@@ -1,163 +1,78 @@
 # =====================================================================
-# 1. pielikums. Veselības datu kvalitātes noteikumu konfigurācijas fails (rules.yml)
+# Universālā datu kvalitātes konfigurācija (AI-driven rules.yml)
 # ---------------------------------------------------------------------
-# Šis konfigurācijas fails ir izstrādāts promocijas darba ietvaros ar mērķi
-# ilustrēt mākslīgā intelekta balstītu, datu centrētu pieeju veselības
-# datu kvalitātes uzlabošanai. Failā definētie noteikumi nosaka validācijas,
-# imputācijas un semantiskās standartizācijas procedūras, kas tiek
-# izmantotas izstrādātajā prototipā “healthdq-ai”.
-#
-# Katrs noteikums atbilst vienai no trim pētījumā analizētajām datu kvalitātes
-# dimensijām — precizitātei, pilnīgumam un atkārtotai izmantojamībai:
-#   - PRECISION: pārbauda datu loģisko un semantisko pareizību (piemēram, ĶMI konsekvenci),
-#   - COMPLETENESS: identificē un aizpilda trūkstošās vērtības,
-#   - REUSABILITY: nodrošina datu semantisko harmonizāciju atbilstoši standartiem.
-#
-# Faila struktūra atbilst FAIR un Data-Centric AI principiem, nodrošinot
-# reproducējamību, pārskatāmību un datu atkārtotu izmantojamību atvērtās
-# zinātnes kontekstā. Šo failu izmanto prototipa noteikumu dzinējs, lai
-# automātiski validētu un uzlabotu veselības datus pirms to tālākas analīzes.
-# =====================================================================
-
-# =====================================================================
-# Data Quality Rules Configuration File
-# Project: healthdq-ai (Promocijas darba prototips)
-# Author: Agate Jarmakoviča, 2025
-# Version: 1.2
-# ---------------------------------------------------------------------
-# Purpose:
-#   Define AI-supported, rule-based data quality validation,
-#   imputation, and semantic normalization for healthcare datasets.
-#   Focused on three core quality dimensions:
-#     - Precision (validity and logical consistency)
-#     - Completeness (missing value detection and imputation)
-#     - Reusability (semantic harmonization and standardization)
-# ---------------------------------------------------------------------
-# Based on FAIR and Data-Centric AI principles.
+# Šis fails vairs nedefinē konkrētus laukus.
+# Tā vietā nosaka MI mācīšanās un noteikumu ģenerēšanas principus.
 # =====================================================================
 
 metadata:
-  dataset: "Healthcare quality dataset"
+  project: "healthdq-ai"
   author: "Agate Jarmakoviča"
-  version: "1.2"
+  version: "2.0"
   created: "2025-10-30"
   description: >
-    Rule-based and machine-learning assisted framework for improving
-    healthcare data quality across precision, completeness, and reusability dimensions.
-
-required_columns:
-  - patient_id
-  - sex_at_birth
-  - birth_date
-  - height_cm
-  - weight_kg
-  - bmi
+    AI-driven framework for adaptive data quality improvement
+    across arbitrary datasets using schema understanding and rule generation.
 
 # ---------------------------------------------------------------------
-# PRECISION (validity and logical correctness)
+# AI CONFIGURATION
 # ---------------------------------------------------------------------
-rules:
-  # Valid categorical values for sex field
-  - name: gender_categorical
-    type: categorical
-    column: sex_at_birth
-    allowed: [F, M, U, female, male, Unknown, Other, None]
-
-  # Birth date must be in the past
-  - name: birth_date_past
-    type: date_in_past
-    column: birth_date
-
-  # Height range based on human physiological limits
-  - name: height_range
-    type: range
-    column: height_cm
-    min: 40
-    max: 250
-
-  # Weight range based on physiological limits
-  - name: weight_range
-    type: range
-    column: weight_kg
-    min: 1
-    max: 400
-
-  # BMI must be nonnegative
-  - name: bmi_nonnegative
-    type: nonnegative
-    column: bmi
-
-  # Logical consistency between height, weight, and BMI
-  - name: bmi_consistency
-    type: derived_consistency
-    formula: "weight_kg / ((height_cm/100)**2)"
-    target_column: bmi
-    tolerance: 0.25  # ±25% tolerance due to measurement variability
-
-  # Derived age range validation
-  - name: age_range
-    type: derived_range
-    derived_from: birth_date
-    min: 0
-    max: 120
-
-  # ICD-10 format pattern validation (optional)
-  - name: icd10_format
-    type: regex_optional
-    column: icd10_code
-    pattern: "^[A-TV-Z][0-9]{2}(\\.[0-9A-Z]{1,2})?$"
+ai_schema_learning:
+  enabled: true
+  model_name: "sentence-transformers/all-MiniLM-L6-v2"
+  outputs:
+    learned_schema: "out/ai_learned_schema.json"
+    suggested_rules: "out/rules_suggested.yml"
 
 # ---------------------------------------------------------------------
-# COMPLETENESS (missing data detection and imputation)
+# RULE GENERATION STRATEGY
+Batini & Scannapieco (2016) “Data and Information Quality”
+Wand & Wang (1996) “Anchoring Data Quality Dimensions in Ontological Foundations”
+# ---------------------------------------------------------------------
+rule_generation:
+  enabled: true
+  based_on:
+    - schema_structure       # kolonnu nosaukumi un tipi
+    - statistical_discovery  # vērtību sadalījums, min/max, uniqueness
+    - semantic_similarity    # semantiskā tuvība zināmiem konceptiem
+  thresholds:
+    correlation: 0.8
+    similarity: 0.75
+  max_rules_per_column: 5
+  output: "out/rules_generated.yml"
+
+# ---------------------------------------------------------------------
+# COMPLETENESS / IMPUTATION STRATEGY
 # ---------------------------------------------------------------------
 imputation:
-  strategy:
-    height_cm: median
-    weight_kg: median
-    sex_at_birth: mode
-    bmi:
-      method: conditional_compute
-      condition: "if weight_kg and height_cm available"
-      formula: "weight_kg / ((height_cm/100)**2)"
+  detect_missing: true
+  methods:
+    numerical: median
+    categorical: mode
+    datetime: interpolate
+    auto: true  # ļauj modelim izvēlēties metodi
+  ai_support:
+    enabled: true
+    model_name: "microsoft/phi-2"  # piemēram, mazo LLM, kas paredz trūkstošās vērtības
 
 # ---------------------------------------------------------------------
-# REUSABILITY (semantic standardization and harmonization)
-# ---------------------------------------------------------------------
-semantic_maps:
-  sex_at_birth:
-    female: F
-    male: M
-    woman: F
-    man: M
-    Female: F
-    Male: M
-    f: F
-    m: M
-    Unknown: U
-    Other: U
-    none: U
-    unspecified: U
-
-# ---------------------------------------------------------------------
-# QUALITY METRICS (before and after processing)
+# METRIC SYSTEM (dynamic)
 # ---------------------------------------------------------------------
 metrics:
-  # Completeness: measure non-null rate
-  - name: completeness_not_null_rate
-    type: not_null_rate
-    columns: [patient_id, sex_at_birth, birth_date, height_cm, weight_kg, bmi]
+  general:
+    - name: completeness_rate
+      type: dynamic_not_null_rate
+      columns: all
 
-  # Precision: measure out-of-range or invalid values
-  - name: precision_out_of_range_rate
-    type: out_of_range_rate
-    columns: [height_cm, weight_kg, bmi]
+    - name: anomaly_rate
+      type: ai_detected_anomalies
+      source: ai_schema_learning
 
-  # Logical consistency: how many BMI values match derived formula
-  - name: logical_consistency_rate
-    type: derived_match_rate
-    columns: [bmi]
+    - name: consistency_index
+      type: logical_coherence
+      compute_from: rules_generated.yml
 
-  # Reusability: categorical harmonization success rate
-  - name: semantic_standardization_rate
-    type: categorical_standardization_rate
-    columns: [sex_at_birth]
+    - name: reusability_index
+      type: semantic_alignment
+      model: "sentence-transformers/all-MiniLM-L6-v2"
+
