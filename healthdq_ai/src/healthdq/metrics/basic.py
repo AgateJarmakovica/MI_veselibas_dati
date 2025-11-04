@@ -1,105 +1,130 @@
 """
-basic.py — Datu kvalitātes rādītāju bāzes aprēķini
-=================================================
+basic.py — Datu kvalitātes pamatmetrikas
+=========================================
 
-Šis modulis ietver pamatfunkcijas datu kvalitātes (DQ) metriku aprēķināšanai
-veselības datu prototipam *healthdq-ai*, kas ir daļa no promocijas darba
-“Mākslīgā intelekta balstītas pieejas veselības datu kvalitātes uzlabošanai
-atvērtās zinātnes iniciatīvās”.
+Šis modulis nodrošina pamatfunkcijas datu kvalitātes novērtēšanai, kas tiek
+izmantotas visās trīs galvenajās dimensijās (Precision, Completeness, Reusability).
 
-Funkcionalitāte:
-----------------
-- Aprēķina bāzes kvalitātes rādītājus:
-    * not_null_rate (pilnīguma indikators)
-    * out_of_range_rate (precizitātes indikators)
-    * semantic_standardization_rate (atkārtotas izmantojamības indikators)
-    * logical_consistency_rate (loģiskā atbilstība, piem. BMI)
-- Nodrošina FAIR reproducējamību, pievienojot metadatus katram mērījumam
-- Lietojams citu modulu (precision_metrics, completeness_metrics, reusability_metrics) ietvaros
+Mērķis:
+--------
+Nodrošināt mērāmu, reproducējamu un universālu datu kvalitātes pamata indikatoru aprēķinu.
 
-Autore: Agate Jarmakoviča  
-Versija: 1.2  
-Datums: 2025-10-30
+Akadēmiskais pamats:
+--------------------
+- Wang, R.Y., & Strong, D.M. (1996). “Beyond Accuracy: What Data Quality Means to Data Consumers.”
+- Batini, C., & Scannapieco, M. (2016). “Data and Information Quality.”
+- Hinrichs, H. (2002). “Measuring completeness and consistency in data quality.”
 """
 
 import pandas as pd
 import numpy as np
-import datetime
+from typing import Dict, Any
 
 
-def metric_record(name: str, value: float, columns=None, dimension=None, stage="raw"):
-    """Izveido strukturētu mērījuma ierakstu ar FAIR metadatiem."""
-    return {
-        "metric_name": name,
-        "value": round(float(value), 4),
-        "dimension": dimension,
-        "columns": columns,
-        "timestamp": datetime.datetime.now().isoformat(),
-        "source_stage": stage
-    }
+def not_null_rate(df: pd.DataFrame) -> float:
+    """Aprēķina datu pilnīguma rādītāju (ne-tukšo vērtību īpatsvaru)."""
+    total = df.size
+    non_null = df.count().sum()
+    return round(non_null / total, 4) if total else 0.0
 
 
-# ---------------------------------------------------------------------
-# COMPLETENESS (pilnīgums)
-# ---------------------------------------------------------------------
-def not_null_rate(df: pd.DataFrame, columns: list[str]) -> dict:
-    """Aprēķina to rindu proporciju, kurās nav trūkstošu vērtību."""
-    subset = df[columns]
-    rate = subset.notnull().mean().mean()
-    return metric_record("not_null_rate", rate, columns, "completeness")
+def missing_value_ratio(df: pd.DataFrame) -> float:
+    """Aprēķina trūkstošo vērtību īpatsvaru."""
+    total = df.size
+    missing = df.isna().sum().sum()
+    return round(missing / total, 4) if total else 0.0
 
 
-def missingness_index(df: pd.DataFrame, columns: list[str]) -> dict:
-    """Trūkstošo vērtību īpatsvars (1 - not_null_rate)."""
-    rate = 1 - df[columns].notnull().mean().mean()
-    return metric_record("missingness_index", rate, columns, "completeness")
-
-
-# ---------------------------------------------------------------------
-# PRECISION (precizitāte un loģiskā korektība)
-# ---------------------------------------------------------------------
-def out_of_range_rate(df: pd.DataFrame, column: str, min_val: float, max_val: float) -> dict:
-    """Aprēķina vērtību proporciju ārpus noteiktā diapazona."""
-    valid_mask = df[column].between(min_val, max_val, inclusive="both")
-    rate = 1 - valid_mask.mean()
-    return metric_record("out_of_range_rate", rate, [column], "precision")
-
-
-def logical_consistency_rate(df: pd.DataFrame, weight_col: str, height_col: str, bmi_col: str, tolerance=0.25) -> dict:
+def out_of_range_rate(df: pd.DataFrame, ranges: Dict[str, Dict[str, Any]]) -> float:
     """
-    Novērtē loģisko atbilstību starp svars, augums un BMI kolonnām.
-    Tolerance ±25% pēc noklusējuma.
+    Aprēķina ārpus diapazona esošo vērtību īpatsvaru pēc definētajiem noteikumiem.
+
+    Parametri:
+    -----------
+    df : pd.DataFrame
+        Ievades dati.
+    ranges : dict
+        Piemēram:
+        {
+            "height_cm": {"min": 40, "max": 250},
+            "weight_kg": {"min": 1, "max": 400}
+        }
     """
-    bmi_calc = df[weight_col] / ((df[height_col] / 100) ** 2)
-    consistent = (abs(bmi_calc - df[bmi_col]) / df[bmi_col]) <= tolerance
-    rate = consistent.mean()
-    return metric_record("logical_consistency_rate", rate, [weight_col, height_col, bmi_col], "precision")
+    if not ranges:
+        return 0.0
+
+    violations = 0
+    total = 0
+
+    for col, limits in ranges.items():
+        if col not in df.columns:
+            continue
+        total += len(df[col])
+        min_val = limits.get("min", -np.inf)
+        max_val = limits.get("max", np.inf)
+        violations += ((df[col] < min_val) | (df[col] > max_val)).sum()
+
+    return round(violations / total, 4) if total else 0.0
 
 
-# ---------------------------------------------------------------------
-# REUSABILITY (atkārtota izmantojamība, semantika)
-# ---------------------------------------------------------------------
-def semantic_standardization_rate(df: pd.DataFrame, column: str, mapping: dict) -> dict:
+def uniqueness_rate(df: pd.DataFrame, subset: list = None) -> float:
+    """Aprēķina ierakstu unikālitātes īpatsvaru pēc noteiktām kolonnām."""
+    if subset is None:
+        subset = df.columns.tolist()
+    unique_rows = df.drop_duplicates(subset=subset)
+    return round(len(unique_rows) / len(df), 4) if len(df) else 0.0
+
+
+def logical_consistency_rate(df: pd.DataFrame, formula: str, target_col: str, tolerance: float = 0.01) -> float:
     """
-    Novērtē, cik liela daļa vērtību tika veiksmīgi saskaņotas ar semantisko karti.
+    Novērtē loģisko konsekvenci starp aprēķinātām un faktiskām vērtībām.
+
+    Piemērs:
+        formula = "weight_kg / ((height_cm/100)**2)"
+        target_col = "bmi"
     """
-    standardized = df[column].map(mapping).notnull()
-    rate = standardized.mean()
-    return metric_record("semantic_standardization_rate", rate, [column], "reusability")
+    if target_col not in df.columns:
+        return 0.0
+
+    try:
+        computed = df.eval(formula)
+        actual = df[target_col]
+        consistent = abs(computed - actual) <= (abs(actual) * tolerance)
+        return round(consistent.mean(), 4)
+    except Exception:
+        return 0.0
 
 
-def categorical_consistency(df: pd.DataFrame, column: str) -> dict:
-    """Vienkāršs rādītājs: unikālo kategoriju skaits (jo mazāks, jo labāk strukturēts)."""
-    unique_ratio = len(df[column].dropna().unique()) / len(df)
-    return metric_record("categorical_consistency", unique_ratio, [column], "reusability")
-
-
-# ---------------------------------------------------------------------
-# UNIVERSĀLĀ KOPSAVILKUMA FUNKCIJA
-# ---------------------------------------------------------------------
-def summarize_metrics(metrics_list: list[dict]) -> pd.DataFrame:
+def entropy_of_column(df: pd.DataFrame, col: str) -> float:
     """
-    Apvieno vairākus metriku ierakstus DataFrame formā.
-    Lieto iekšēji katra aģenta (agent) “report” posmā.
+    Aprēķina entropiju (H) kolonnai, kas norāda semantisko dispersiju.
+    Zema entropija = augsta harmonizācija (reusability dimensija).
     """
-    return pd.DataFrame(metrics_list)
+    if col not in df.columns:
+        return 0.0
+
+    freq = df[col].value_counts(normalize=True)
+    return round(-(freq * np.log2(freq + 1e-9)).sum(), 4)
+
+
+def categorical_harmonization_rate(df: pd.DataFrame, semantic_map: Dict[str, str]) -> float:
+    """
+    Aprēķina semantiskās harmonizācijas rādītāju, salīdzinot ar mapējumu.
+
+    Parametri:
+    -----------
+    semantic_map : dict
+        Piemēram {"female": "F", "male": "M", "woman": "F"}
+    """
+    if not semantic_map:
+        return 1.0
+
+    total = 0
+    matched = 0
+    for col in df.columns:
+        if df[col].dtype == "object":
+            total += len(df[col])
+            mapped_values = df[col].astype(str).map(semantic_map).notnull().sum()
+            matched += mapped_values
+
+    return round(matched / total, 4) if total else 1.0
