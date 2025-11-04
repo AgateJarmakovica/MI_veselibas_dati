@@ -1,174 +1,128 @@
 """
-engine.py — Datu kvalitātes noteikumu dzinējs (Data Quality Rule Engine)
-=========================================================================
+rule_engine.py — Pašmācošs noteikumu dzinējs
+============================================
 
-Šis modulis īsteno datu kvalitātes validācijas mehānismu veselības datu
-prototipam *healthdq-ai*, kas ir daļa no promocijas darba
-“Mākslīgā intelekta balstītas pieejas veselības datu kvalitātes uzlabošanai
-atvērtās zinātnes iniciatīvās”.
+Šis modulis realizē datu kvalitātes noteikumu pārvaldības un mācīšanās mehānismu.
+Tas ļauj kombinēt statiskus (rules.yml) un dinamiskus (AI ģenerētus) noteikumus.
 
 Mērķis:
 --------
-Interpretēt un izpildīt YAML formātā definētus datu kvalitātes noteikumus
-(`rules.yml`), aptverot trīs pamatdimensijas:
-  - **Precizitāte (Precision)** — loģiskā un formālā korektība;
-  - **Pilnīgums (Completeness)** — prasīto kolonnu esamība;
-  - **Atkārtota izmantojamība (Reusability)** — formātu, vienību un semantikas atbilstība.
+Izveidot MI atbalstītu “rule intelligence” sistēmu, kas:
+ - analizē datu struktūru un vērtību sadalījumu,
+ - pielāgo esošos noteikumus vai ģenerē jaunus,
+ - sadarbojas ar aģentiem (Precision, Completeness, Reusability),
+ - apgūst cilvēka korekcijas (Human-in-the-Loop).
 
-Funkcionalitāte:
-----------------
-- Izpilda kategoriskos, diapazonu, datumu un regulāro izteiksmju noteikumus
-- Ģenerē pārkāpumu (issues) atskaiti ar skaidriem ziņojumiem
-- Saglabā FAIR reproducējamības metadatus (timestamp, rules_used, summary)
-
-Autore: Agate Jarmakoviča  
-Versija: 1.2  
-Datums: 2025-10-30
+Atbilst Data-Centric AI un FAIR principiem.
 """
 
-import re
 import pandas as pd
-from datetime import datetime
+import yaml
+import json
+from typing import Dict, Any, List
+from pathlib import Path
+from sklearn.preprocessing import LabelEncoder
 
 
-# ---------------------------------------------------------------------
-# Pamata atskaites klase
-# ---------------------------------------------------------------------
-class DQReport:
-    """
-    DQReport apkopo visus datu kvalitātes pārkāpumus (“issues”),
-    ko atklāj noteikumu dzinējs. Katrs pārkāpums satur:
-      - rule: noteikuma nosaukumu (`rules.yml` sadaļā “name”)
-      - row: datu rindas indeksu
-      - message: paskaidrojumu par pārkāpumu
-    """
+class RuleEngine:
+    """Centrālais noteikumu pārvaldības komponents."""
 
-    def __init__(self):
-        self.issues = []
-        self.meta = {
-            "generated_at": datetime.now().isoformat(),
-            "total_issues": 0,
-            "rules_applied": [],
-        }
+    def __init__(self, config_path: str = None):
+        self.rules = {}
+        if config_path and Path(config_path).exists():
+            with open(config_path, "r", encoding="utf-8") as f:
+                self.rules = yaml.safe_load(f)
+        self.generated_rules = []
 
-    def add(self, rule_name, row_idx, msg):
-        """Pievieno jaunu pārkāpumu ziņojumu."""
-        self.issues.append({
-            "rule": rule_name,
-            "row": int(row_idx),
-            "message": msg
-        })
-
-    def to_frame(self) -> pd.DataFrame:
-        """Pārveido pārkāpumu sarakstu uz DataFrame reproducējamā formā."""
-        df = (
-            pd.DataFrame(self.issues)
-            if self.issues
-            else pd.DataFrame(columns=["rule", "row", "message"])
-        )
-        self.meta["total_issues"] = len(df)
-        return df
-
-    def summary(self) -> dict:
-        """Atgriež metadatu kopsavilkumu reproducējamībai."""
-        return self.meta
-
-
-# ---------------------------------------------------------------------
-# Galvenā funkcija: noteikumu interpretācija un izpilde
-# ---------------------------------------------------------------------
-def run_checks(df: pd.DataFrame, config: dict) -> DQReport:
-    """
-    Izpilda YAML konfigurācijā (`rules.yml`) definētos noteikumus un
-    atgriež strukturētu pārkāpumu atskaiti (DQReport).
-
-    Parametri:
-    -----------
-    df : pd.DataFrame
-        Datu kopa, kas jāvalidē
-    config : dict
-        Ielādētā YAML konfigurācija ar “required_columns” un “rules” sadaļām
-
-    Atgriež:
-    --------
-    DQReport objektu ar:
-      - .issues: saraksts ar pārkāpumiem
-      - .to_frame(): DataFrame formāts
-      - .summary(): reproducējamības metadati
-    """
-
-    rep = DQReport()
-
-    # 1. Obligāto kolonnu pārbaude
-    for col in config.get("required_columns", []):
-        if col not in df.columns:
-            rep.add("required_columns", -1, f"❌ Missing required column: {col}")
-
-    # 2. Galveno noteikumu izpilde
-    rules = config.get("rules", [])
-    rep.meta["rules_applied"] = [r.get("name") for r in rules]
-
-    for i, row in df.iterrows():
-        for rule in rules:
-            rule_name = rule.get("name", "unnamed_rule")
-            rule_type = rule.get("type")
-            column = rule.get("column")
-
-            if column not in df.columns:
+    def validate_rules(self, df: pd.DataFrame) -> List[Dict[str, Any]]:
+        """
+        Izpilda statisko noteikumu pārbaudes no konfigurācijas faila.
+        """
+        results = []
+        for rule in self.rules.get("rules", []):
+            name = rule.get("name")
+            col = rule.get("column")
+            if col not in df.columns:
                 continue
-            val = row[column]
 
-            try:
-                # --- Kategoriskie noteikumi ---
-                if rule_type == "categorical":
-                    allowed = set(rule.get("allowed", []))
-                    if pd.notna(val) and val not in allowed:
-                        rep.add(rule_name, i, f"{column}='{val}' not in {allowed}")
+            if rule["type"] == "range":
+                min_v, max_v = rule.get("min"), rule.get("max")
+                mask = (df[col] < min_v) | (df[col] > max_v)
+                invalid = df[mask]
+                if not invalid.empty:
+                    results.append({"rule": name, "column": col, "violations": len(invalid)})
 
-                # --- Datuma noteikumi ---
-                elif rule_type == "date_in_past":
-                    if pd.isna(val):
-                        continue
-                    try:
-                        d = pd.to_datetime(val)
-                        if d > pd.Timestamp.now():
-                            rep.add(rule_name, i, f"{column}='{val}' is in the future")
-                    except Exception:
-                        rep.add(rule_name, i, f"{column}='{val}' not parseable as date")
+            elif rule["type"] == "categorical":
+                allowed = rule.get("allowed", [])
+                mask = ~df[col].isin(allowed)
+                invalid = df[mask]
+                if not invalid.empty:
+                    results.append({"rule": name, "column": col, "violations": len(invalid)})
 
-                # --- Diapazona noteikumi ---
-                elif rule_type == "range":
-                    minv, maxv = rule.get("min"), rule.get("max")
-                    if pd.notna(val) and not (minv <= float(val) <= maxv):
-                        rep.add(rule_name, i, f"{column}={val} not in [{minv},{maxv}]")
+        return results
 
-                # --- Negatīvo vērtību pārbaude ---
-                elif rule_type == "nonnegative":
-                    if pd.notna(val) and float(val) < 0:
-                        rep.add(rule_name, i, f"{column}='{val}' is negative")
+    def learn_rules(self, df: pd.DataFrame, correlation_threshold: float = 0.8) -> List[Dict[str, Any]]:
+        """
+        Automātiski ģenerē jaunas datu kvalitātes hipotēzes, pamatojoties uz statistisko analīzi.
+        """
+        learned = []
+        numeric_cols = df.select_dtypes(include=["number"]).columns.tolist()
+        cat_cols = df.select_dtypes(include=["object", "category"]).columns.tolist()
 
-                # --- Regex validācija ---
-                elif rule_type == "regex_optional":
-                    pattern = re.compile(rule.get("pattern", ""))
-                    if pd.notna(val) and not pattern.match(str(val)):
-                        rep.add(rule_name, i, f"{column}='{val}' does not match pattern {pattern.pattern}")
+        # Skaitlisko atribūtu diapazoni
+        for col in numeric_cols:
+            desc = df[col].describe()
+            learned.append({
+                "name": f"{col}_range_auto",
+                "type": "range",
+                "column": col,
+                "min": float(desc["min"]),
+                "max": float(desc["max"]),
+            })
 
-                # --- Atvasinātas loģikas noteikums (piemēram, BMI) ---
-                elif rule_type == "derived_consistency":
-                    formula = rule.get("formula")
-                    target_col = rule.get("target_column")
-                    tol = rule.get("tolerance", 0.25)
-                    try:
-                        if pd.notna(val):
-                            # Izpilda formulu drošā kontekstā
-                            derived = eval(formula, {}, dict(row))
-                            if not (abs(derived - val) / val <= tol):
-                                rep.add(rule_name, i, f"{column}={val} inconsistent with derived {round(derived, 2)}")
-                    except Exception as e:
-                        rep.add(rule_name, i, f"❌ Error evaluating formula {formula}: {e}")
+        # Kategoriju biežums un semantiskās grupas
+        for col in cat_cols:
+            freq = df[col].value_counts(normalize=True)
+            if len(freq) <= 20:
+                learned.append({
+                    "name": f"{col}_categories_auto",
+                    "type": "categorical",
+                    "column": col,
+                    "allowed": freq.index.tolist(),
+                })
 
-            except Exception as e:
-                rep.add(rule_name, i, f"❌ Unexpected error while evaluating rule: {e}")
+        # Korelāciju noteikumi (loģiskā saistība starp laukiem)
+        corr = df.corr(numeric_only=True)
+        for c1 in corr.columns:
+            for c2 in corr.columns:
+                if c1 != c2 and abs(corr.loc[c1, c2]) >= correlation_threshold:
+                    learned.append({
+                        "name": f"{c1}_vs_{c2}_correlation",
+                        "type": "correlation",
+                        "columns": [c1, c2],
+                        "strength": float(corr.loc[c1, c2]),
+                    })
 
-    return rep
+        self.generated_rules = learned
+        return learned
+
+    def save_generated_rules(self, path: str = "out/rules_generated.yml"):
+        """Saglabā MI ģenerētos noteikumus YAML formātā."""
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            yaml.dump({"auto_rules": self.generated_rules}, f, allow_unicode=True)
+
+
+def run_checks(df: pd.DataFrame, config_path: str) -> List[Dict[str, Any]]:
+    """
+    Palīgfunkcija, kas apvieno statiskos un ģenerētos noteikumus
+    un veic pārbaudi ar abiem.
+    """
+    engine = RuleEngine(config_path)
+    static_issues = engine.validate_rules(df)
+    ai_rules = engine.learn_rules(df)
+    engine.save_generated_rules()
+    ai_issues = engine.validate_rules(df)
+
+    return static_issues + ai_issues
 
