@@ -1,76 +1,85 @@
 """
-csv_loader
-==========
+csv_loader.py — CSV datu ielādes modulis
 
-Šis modulis īsteno CSV formāta datu ielādi veselības datu kvalitātes
-prototipam *healthdq-ai*, kas ir daļa no promocijas darba
-“Mākslīgā intelekta balstītas pieejas veselības datu kvalitātes uzlabošanai
-atvērtās zinātnes iniciatīvās”.
+Šis modulis nodrošina drošu un automatizētu CSV datu ielādi,
+atbalstot plašu formātu klāstu (UTF-8, semikols, komats, tab),
+un sākotnēju strukturālo analīzi (Schema Discovery).
 
-Mērķis:
---------
-Droši un reproducējami ielādēt CSV failus, pārbaudīt pamatkolonnu esamību
-un ģenerēt metadatus, kas atbalsta FAIR principus (Findable, Accessible, Interoperable, Reusable).
+Funkcionālais mērķis:
+1. Droša CSV ielāde neatkarīgi no faila formāta.
+2. Automātiska datu tipu un struktūras noteikšana.
+3. Saderība ar MI datu kvalitātes cauruļvadu (healthdq-ai).
 
-Funkcionalitāte:
-----------------
-- Ielādē CSV datus ar `pandas`
-- Validē formātu un kolonnu tipu konsekvenci
-- Saglabā reproducējamības metadatus (faila nosaukums, rindu skaits, ielādes laiks)
-- Nodrošina caurspīdīgu kļūdu ziņošanu (piemēram, ja failā trūkst nepieciešamās kolonnas)
 
-Autore: Agate Jarmakoviča  
-Versija: 1.2  
-Datums: 2025-10-30
 """
 
 import pandas as pd
+import chardet
 import os
-import datetime
+from typing import Tuple, Dict, Any
 
 
-def load_csv(path: str, required_columns: list[str] | None = None) -> pd.DataFrame:
+def detect_encoding(file_path: str) -> str:
+    """Nosaka faila kodējumu (droši arī ne-UTF-8 gadījumos)."""
+    with open(file_path, "rb") as f:
+        result = chardet.detect(f.read(100000))
+    return result["encoding"] or "utf-8"
+
+
+def analyze_schema(df: pd.DataFrame) -> Dict[str, Any]:
     """
-    Ielādē CSV datu failu ar reproducējamības un kvalitātes validāciju.
+    Veic sākotnējo datu struktūras analīzi:
+    - kolonnu tipi
+    - unikālo vērtību īpatsvars
+    - trūkstošo vērtību īpatsvars
+    """
+    schema = {}
+    for col in df.columns:
+        non_null = df[col].notnull().sum()
+        schema[col] = {
+            "dtype": str(df[col].dtype),
+            "non_null_rate": round(non_null / len(df), 3) if len(df) else 0,
+            "unique_rate": round(df[col].nunique() / len(df), 3) if len(df) else 0,
+            "example_values": df[col].dropna().astype(str).head(3).tolist()
+        }
+    return schema
+
+
+def load_csv(file_path: str) -> pd.DataFrame:
+    """
+    Ielādē CSV datu kopu, neatkarīgi no kodējuma un atdalītāja,
+    un atgriež DataFrame objektu.
 
     Parametri:
     -----------
-    path : str
-        Ceļš uz CSV failu.
-    required_columns : list[str], optional
-        Kolonnu saraksts, kas obligāti jābūt datu kopā
-        (piemēram, ["patient_id", "height_cm", "weight_kg", "bmi"])
+    file_path: str — ceļš uz CSV failu
 
     Atgriež:
     --------
-    df : pd.DataFrame
-        Ielādēta datu kopa ar pievienotiem metadatiem (`attrs["meta"]`).
+    pd.DataFrame — ielādētie dati
     """
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"Failu '{file_path}' nevar atrast.")
 
-    if not os.path.exists(path):
-        raise FileNotFoundError(f"❌ CSV fails nav atrasts: {path}")
+    encoding = detect_encoding(file_path)
 
-    try:
-        df = pd.read_csv(path)
-    except Exception as e:
-        raise RuntimeError(f"❌ Neizdevās nolasīt CSV failu: {e}")
+    # mēģina atpazīt atdalītāju
+    with open(file_path, "r", encoding=encoding, errors="ignore") as f:
+        sample = f.readline()
+    sep = ";" if ";" in sample else "," if "," in sample else "\t"
 
-    # Validē obligātās kolonnas
-    if required_columns:
-        missing = [c for c in required_columns if c not in df.columns]
-        if missing:
-            raise ValueError(f"❌ CSV failā trūkst obligātās kolonnas: {missing}")
+    df = pd.read_csv(file_path, sep=sep, encoding=encoding)
+    if df.empty:
+        raise ValueError("Ielādētais CSV fails ir tukšs vai neatpazīts.")
 
-    # Izveido reproducējamības metadatus
-    meta = {
-        "loader": "CSV",
-        "path": os.path.abspath(path),
-        "rows": len(df),
-        "columns": list(df.columns),
-        "timestamp": datetime.datetime.now().isoformat(),
-        "file_size_kb": round(os.path.getsize(path) / 1024, 2),
-        "required_columns_checked": required_columns if required_columns else None,
-    }
+    # pievieno automātisku shēmas analīzi
+    schema = analyze_schema(df)
+    print("Datu struktūras analīze (pirmie lauki):")
+    for col, info in list(schema.items())[:5]:
+        print(f"  {col}: {info}")
+
+    return df
+
 
     # Saglabā metadatus DataFrame atribūtos (FAIR reproducējamībai)
     df.attrs["meta"] = meta
