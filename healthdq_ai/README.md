@@ -56,23 +56,44 @@ Atvērt pārlūkā: http://127.0.0.1:8000/docs
 
 
 
-healthdq_ai/
-├── configs/
-│   └── rules.yml                     # Datu kvalitātes noteikumi YAML formātā
-├── src/healthdq/
-│   ├── agents/                       # MI aģenti (Precision, Completeness, Reusability)
-│   ├── api/                          # REST API (FastAPI serveris)
-│   │   └── server.py
-│   ├── loaders/                      # CSV / JSON / FHIR datu ielādes adapteri
-│   ├── metrics/                      # Pirms/pēc metriku kalkulācija
-│   ├── rules/                        # Noteikumu dzinējs un transformācijas
-│   ├── ui/                           # Streamlit UI
-│   ├── pipeline.py                   # Galvenais AI cauruļvads
-│   ├── cli.py                        # Komandrindas izpilde
-│   └── __init__.py
-├── data/sample/                      # Sintētiskie testdati
-├── out/                              # Izvades rezultāti
-└── requirements.txt
+MI_veselibas_dati/
+│
+├── healthdq_ai/
+│   ├── configs/
+│   │   └── rules.yml
+│   ├── data/sample/
+│   │   └── 500_dati_testiem.csv
+│   ├── docs/
+│   ├── src/healthdq/
+│   │   ├── __init__.py
+│   │   ├── cli.py
+│   │   ├── pipeline.py
+│   │   ├── api/
+│   │   │   └── api_server.py     ← (šeit būs API)
+│   │   ├── schema/
+│   │   │   └── schema_learner.py
+│   │   ├── agents/
+│   │   │   ├── precision.py
+│   │   │   ├── completeness.py
+│   │   │   ├── reusability.py
+│   │   │   └── __init__.py
+│   │   ├── loaders/
+│   │   │   └── __init__.py
+│   │   ├── metrics/
+│   │   │   └── __init__.py
+│   │   ├── rules/
+│   │   │   └── __init__.py
+│   │   ├── ui/
+│   │   │   ├── __init__.py
+│   │   │   └── streamlit_app.py
+│   │   └── utils/
+│   │       └── file_ops.py
+│   ├── Dockerfile
+│   ├── Makefile
+│   ├── requirements.txt
+│   ├── pyproject.toml
+│   └── README.md
+
 
 
 Izvades artefakti
