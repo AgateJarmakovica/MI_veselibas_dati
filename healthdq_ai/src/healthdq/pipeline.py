@@ -42,31 +42,6 @@ from .rules import run_checks
 from .schema_learner import SchemaLearner
 
 
-_YAML_MODULE: ModuleType | None = None
-
-
-def _get_yaml_module() -> ModuleType:
-    """Atrod un ielādē PyYAML ar skaidru kļūdas ziņojumu, ja tas nav pieejams."""
-    global _YAML_MODULE
-    if _YAML_MODULE is not None:
-        return _YAML_MODULE
-
-    spec = importlib.util.find_spec("yaml")
-    if spec is None:
-        raise ModuleNotFoundError(
-            "PyYAML nav instalēts. Lūdzu pievienojiet `pyyaml` atkarībām vai "
-            "instalējiet to ar `pip install pyyaml`, lai ielādētu rules.yml konfigurācijas."
-        )
-
-    module = importlib.util.module_from_spec(spec)
-    loader = spec.loader
-    if loader is None:
-        raise ImportError("Neizdevās inicializēt PyYAML moduļa ielādi.")
-    loader.exec_module(module)  # type: ignore[attr-defined]
-    _YAML_MODULE = module
-    return module
-
-
 LOADERS = {
     "csv": load_csv,
     "json": load_json_records,
