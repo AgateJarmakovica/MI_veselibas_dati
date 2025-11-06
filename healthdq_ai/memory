@@ -1,1 +1,10 @@
 
+MI sistēmai jāsaglabā atmiņa par iepriekš analizētajiem datiem, noteikumu validācijām un cilvēka lēmumiem.
+
+Tas ļauj:
+
+sekot līdzi, kā mainās datu kvalitāte laika gaitā,
+
+iemācīties no cilvēka izvēlēm (“approved / rejected” noteikumi),
+
+reproducēt iepriekšējās sesijas (reproducibility evidence).
