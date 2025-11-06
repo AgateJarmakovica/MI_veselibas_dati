@@ -39,7 +39,7 @@ from .loaders import load_csv, load_json_records, load_fhir_patient_bundle
 from .agents import PrecisionAgent, CompletenessAgent, ReusabilityAgent
 from .metrics import compute_metrics
 from .rules import run_checks
-from .schema.schema_learner import SchemaLearner
+from .schema_learner import SchemaLearner
 
 
 LOADERS = {

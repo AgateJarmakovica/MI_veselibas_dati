@@ -17,13 +17,18 @@
 import pandas as pd
 import numpy as np
 import json
-from sentence_transformers import SentenceTransformer, util
 import os
+
+try:  # pragma: no cover - ārēja atkarība nav obligāta testos
+    from sentence_transformers import SentenceTransformer, util
+except ImportError:  # pragma: no cover
+    SentenceTransformer = None
+    util = None
 
 class SchemaLearner:
     def __init__(self, model_name="sentence-transformers/paraphrase-MiniLM-L6-v2"):
         self.model_name = model_name
-        self.model = SentenceTransformer(model_name)
+        self.model = SentenceTransformer(model_name) if SentenceTransformer else None
 
     def infer_roles(self, df: pd.DataFrame, predefined_roles=None):
         """Nosaka katras kolonnas iespējamo nozīmi (semantisko lomu)."""
@@ -34,6 +39,16 @@ class SchemaLearner:
             ]
 
         col_names = df.columns.tolist()
+
+        if self.model is None or util is None:
+            mapping = {}
+            for col in col_names:
+                col_norm = col.lower()
+                best = next((role for role in predefined_roles if role in col_norm), "unknown")
+                confidence = 1.0 if best != "unknown" else 0.3
+                mapping[col] = {"predicted_role": best, "confidence": round(confidence, 3)}
+            return mapping
+
         column_embeddings = self.model.encode(col_names, convert_to_tensor=True)
         role_embeddings = self.model.encode(predefined_roles, convert_to_tensor=True)
         similarities = util.cos_sim(column_embeddings, role_embeddings)
