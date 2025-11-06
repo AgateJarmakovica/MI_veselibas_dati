@@ -81,5 +81,3 @@ class ReusabilityAgent:
         score = matched_values / total_values
         logging.info(f"Reusability harmonization success rate: {score:.4f}")
         return score
-
-    return df, log

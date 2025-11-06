@@ -14,13 +14,20 @@ Funkcionālais mērķis:
 """
 
 import pandas as pd
-import chardet
 import os
-from typing import Tuple, Dict, Any
+from typing import Dict, Any
+
+try:  # pragma: no cover - atkarība nav obligāta testos
+    import chardet
+except ImportError:  # pragma: no cover
+    chardet = None
 
 
 def detect_encoding(file_path: str) -> str:
     """Nosaka faila kodējumu (droši arī ne-UTF-8 gadījumos)."""
+    if chardet is None:
+        return "utf-8"
+
     with open(file_path, "rb") as f:
         result = chardet.detect(f.read(100000))
     return result["encoding"] or "utf-8"
@@ -77,11 +84,5 @@ def load_csv(file_path: str) -> pd.DataFrame:
     print("Datu struktūras analīze (pirmie lauki):")
     for col, info in list(schema.items())[:5]:
         print(f"  {col}: {info}")
-
-    return df
-
-
-    # Saglabā metadatus DataFrame atribūtos (FAIR reproducējamībai)
-    df.attrs["meta"] = meta
 
     return df

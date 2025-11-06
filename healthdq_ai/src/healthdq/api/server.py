@@ -33,7 +33,7 @@ async def run_quality_pipeline(
     kind: str = Form("csv")
 ):
     """
-    Augšupielādē datu failu un palaid AI cauruļvadu (run_pipeline)
+    Augšupielādē datu failu un palaiž AI cauruļvadu (run_pipeline)
     """
     try:
         input_path = os.path.join(OUT_DIR, file.filename)
