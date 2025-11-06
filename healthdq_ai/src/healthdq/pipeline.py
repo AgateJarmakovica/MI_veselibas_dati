@@ -31,8 +31,8 @@ Datums: 2025-10-30
 
 import os
 import json
-import yaml
-import pandas as pd
+import importlib.util
+from types import ModuleType
 from datetime import datetime
 
 from .loaders import load_csv, load_json_records, load_fhir_patient_bundle
@@ -51,6 +51,7 @@ LOADERS = {
 
 def load_config(path: str) -> dict:
     """Ielādē YAML konfigurācijas failu (rules.yml)."""
+    yaml = _get_yaml_module()
     with open(path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
