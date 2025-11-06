@@ -69,25 +69,30 @@ MI_veselibas_dati/
 │   │   ├── cli.py
 │   │   ├── pipeline.py
 │   │   ├── api/
-│   │   │   └── api_server.py     ← (šeit būs API)
-│   │   ├── schema/
-│   │   │   └── schema_learner.py
+│   │   │   └── server.py         ← FastAPI serviss
 │   │   ├── agents/
 │   │   │   ├── precision.py
 │   │   │   ├── completeness.py
 │   │   │   ├── reusability.py
 │   │   │   └── __init__.py
 │   │   ├── loaders/
+│   │   │   ├── csv_loader.py
+│   │   │   ├── json_loader.py
+│   │   │   ├── fhir_loader.py
 │   │   │   └── __init__.py
 │   │   ├── metrics/
+│   │   │   ├── basic.py
 │   │   │   └── __init__.py
 │   │   ├── rules/
+│   │   │   ├── engine.py
+│   │   │   ├── transform.py
+│   │   │   ├── validation.py
+│   │   │   ├── learning.py
+│   │   │   ├── generation.py
 │   │   │   └── __init__.py
-│   │   ├── ui/
-│   │   │   ├── __init__.py
-│   │   │   └── streamlit_app.py
-│   │   └── utils/
-│   │       └── file_ops.py
+│   │   ├── schema_learner.py     ← MI shēmas atpazinējs saknes līmenī
+│   │   └── ui/
+│   │       └── streamlit_app.py
 │   ├── Dockerfile
 │   ├── Makefile
 │   ├── requirements.txt

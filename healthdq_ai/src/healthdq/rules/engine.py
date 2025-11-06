@@ -21,7 +21,6 @@ import yaml
 import json
 from typing import Dict, Any, List
 from pathlib import Path
-from sklearn.preprocessing import LabelEncoder
 
 
 class RuleEngine:
