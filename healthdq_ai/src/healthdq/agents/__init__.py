@@ -24,6 +24,11 @@ Datums: 2025-10-30
 """
 
 from importlib import import_module
+from .precision import PrecisionAgent
+from .completeness import CompletenessAgent
+from .reusability import ReusabilityAgent
+
+__all__ = ["PrecisionAgent", "CompletenessAgent", "ReusabilityAgent"]
 
 AGENT_CLASSES = {
     "PrecisionAgent": "healthdq.agents.precision.PrecisionAgent",
